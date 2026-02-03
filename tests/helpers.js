@@ -90,4 +90,22 @@ async function getControllerSpeed(page) {
   });
 }
 
-module.exports = { getPlaybackRate, hasIndicator, getControllerSpeed, waitForVideo };
+async function getAllPlaybackRates(page) {
+  return page.evaluate(() => {
+    const videos = document.querySelectorAll("video");
+    return Array.from(videos).map((v) => v.playbackRate);
+  });
+}
+
+async function countVideos(page) {
+  return page.evaluate(() => document.querySelectorAll("video").length);
+}
+
+module.exports = {
+  getPlaybackRate,
+  hasIndicator,
+  getControllerSpeed,
+  waitForVideo,
+  getAllPlaybackRates,
+  countVideos,
+};

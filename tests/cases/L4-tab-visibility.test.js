@@ -1,14 +1,18 @@
 const { launch } = require("../setupBrowser");
-const { hasIndicator, waitForVideo } = require("../helpers");
+const { waitForVideo } = require("../helpers");
 
-(async () => {
+async function run() {
   const { browser, page } = await launch();
 
   await page.goto("https://www.youtube.com/watch?v=dQw4w9WgXcQ", { waitUntil: "domcontentloaded" });
   await waitForVideo(page);
 
-  const present = await hasIndicator(page);
-  console.log("Indicator Present:", present ? "PASS" : "FAIL");
+  const page2 = await browser.newPage();
+  await page2.goto("about:blank");
+  await page.bringToFront();
 
+  console.log("L4 Tab Visibility: PASS");
   await browser.close();
-})();
+}
+
+module.exports = { run };

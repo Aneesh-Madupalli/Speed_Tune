@@ -1,10 +1,12 @@
 const { launch } = require("../setupBrowser");
 const { getPlaybackRate, waitForVideo } = require("../helpers");
 
-(async () => {
+const baseUrl = process.env.FIXTURE_BASE_URL || "http://127.0.0.1:8765";
+
+async function run() {
   const { browser, page } = await launch();
 
-  await page.goto("https://www.youtube.com/watch?v=dQw4w9WgXcQ", { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/single-video.html`, { waitUntil: "domcontentloaded" });
   await waitForVideo(page);
 
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -12,7 +14,9 @@ const { getPlaybackRate, waitForVideo } = require("../helpers");
 
   const rate = await getPlaybackRate(page);
   const pass = typeof rate === "number" && rate >= 0.1 && rate <= 16;
-  console.log("Save Speed Reload:", pass ? "PASS" : "FAIL", pass ? `(rate: ${rate}x after reload)` : "");
+  console.log("L3 Save Speed / Reload:", pass ? "PASS" : "FAIL", pass ? "(valid rate after reload)" : "");
 
   await browser.close();
-})();
+}
+
+module.exports = { run };

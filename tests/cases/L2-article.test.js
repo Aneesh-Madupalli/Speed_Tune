@@ -1,15 +1,17 @@
 const { launch } = require("../setupBrowser");
 const { hasIndicator } = require("../helpers");
 
-(async () => {
+async function run() {
   const { browser, page } = await launch();
 
-  // Article/image page: no primary video in main document (indicator must NOT show)
   await page.goto("https://example.com");
   await new Promise((r) => setTimeout(r, 5000));
 
-  const present = await hasIndicator(page);
-  console.log("No Indicator on Article:", !present ? "PASS" : "FAIL");
+  const indicator = await hasIndicator(page);
+  const pass = !indicator;
+  console.log("L2 Article (no video):", pass ? "PASS" : "FAIL", pass ? "(no indicator, no false detection)" : "");
 
   await browser.close();
-})();
+}
+
+module.exports = { run };

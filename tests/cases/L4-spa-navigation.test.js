@@ -1,7 +1,7 @@
 const { launch } = require("../setupBrowser");
 const { getPlaybackRate, waitForVideo } = require("../helpers");
 
-(async () => {
+async function run() {
   const { browser, page } = await launch();
 
   const url1 = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
@@ -18,7 +18,9 @@ const { getPlaybackRate, waitForVideo } = require("../helpers");
 
   const rate = await getPlaybackRate(page);
   const pass = typeof rate === "number" && rate >= 0.1 && rate <= 16;
-  console.log("SPA Navigation:", pass ? "PASS" : "FAIL", pass ? `(rate: ${rate}x after nav)` : "");
+  console.log("L4 SPA Navigation:", pass ? "PASS" : "FAIL");
 
   await browser.close();
-})();
+}
+
+module.exports = { run };
