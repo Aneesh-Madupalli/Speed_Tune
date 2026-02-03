@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Speed Tune",
+  "version": "1.0.0",
+  "description": "Premium video speed control for any website with intuitive UI and smooth animations",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Speed Tune",
+    "default_icon": {
+      "16": "images/speed_tune_logo.png",
+      "32": "images/speed_tune_logo.png",
+      "48": "images/speed_tune_logo.png",
+      "128": "images/speed_tune_logo.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "commands": {
+    "increase-speed-small": {
+      "suggested_key": {
+        "default": "Ctrl+Period"
+      },
+      "description": "Increase speed by 0.1x"
+    },
+    "decrease-speed-small": {
+      "suggested_key": {
+        "default": "Ctrl+Comma"
+      },
+      "description": "Decrease speed by 0.1x"
+    },
+    "increase-speed-large": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Period"
+      },
+      "description": "Increase speed by 1x"
+    },
+    "reset-speed": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Comma"
+      },
+      "description": "Reset to 1x speed"
+    }
+  },
+  "icons": {
+    "16": "images/speed_tune_logo.png",
+    "32": "images/speed_tune_logo.png",
+    "48": "images/speed_tune_logo.png",
+    "128": "images/speed_tune_logo.png"
+  }
+}

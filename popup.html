@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speed Tune</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header-panel">
+            <div class="header-top">
+                <h1 class="title">Speed Tune</h1>
+                <div class="status" role="status" aria-live="polite">
+                    <div class="status-dot" id="statusDot" aria-hidden="true"></div>
+                    <span class="status-text" id="statusText" title="Video detection status">Checking...</span>
+                </div>
+            </div>
+
+            <!-- Current Speed Display -->
+            <div class="speed-display">
+                <div class="speed-value" id="speedValue">1.0x</div>
+                <div class="speed-label">Current Speed</div>
+            </div>
+        </div>
+
+        <!-- Speed Controls -->
+        <div class="controls-panel">
+            <!-- Speed Slider -->
+            <div class="slider-section">
+                <label class="section-label" for="speedSlider">Speed Control</label>
+                <div class="slider-container">
+                    <input type="range" id="speedSlider" class="speed-slider" min="0.1" max="16" step="0.1" value="1.0" aria-label="Playback speed 0.1 to 16 times" aria-valuemin="0.1" aria-valuemax="16" aria-valuenow="1.0">
+                    <div class="slider-labels">
+                        <span>0.1x</span>
+                        <span>16x</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Speed Adjustment Buttons -->
+            <div class="button-controls">
+                <button class="control-btn minus-btn" id="minusBtn">−</button>
+                <div class="input-container">
+                    <input type="number" id="speedInput" class="speed-input" min="0.1" max="16" step="0.1" value="1.0" aria-label="Speed value (0.1–16)">
+                    <div class="input-arrows">
+                        <button type="button" class="arrow-btn arrow-up" id="inputArrowUp" title="Increase by 0.1x">
+                            <svg viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 7l5-5 5 5"/>
+                            </svg>
+                        </button>
+                        <button type="button" class="arrow-btn arrow-down" id="inputArrowDown" title="Decrease by 0.1x">
+                            <svg viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 1l5 5 5-5"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <button class="control-btn plus-btn" id="plusBtn">+</button>
+            </div>
+
+            <!-- Reset Button -->
+            <button class="reset-btn" id="resetBtn">Reset to 1x</button>
+        </div>
+
+        <!-- Settings -->
+        <div class="settings-panel">
+            <h3 class="settings-title">Settings</h3>
+
+            <!-- Save Speed Toggle -->
+            <div class="setting-item">
+                <div class="setting-info">
+                    <div class="setting-name">Save Speed</div>
+                    <div class="setting-desc">Remember speed across sessions</div>
+                </div>
+                <div class="toggle" id="saveSpeedToggle">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+
+            <!-- Speed Indicator Toggle -->
+            <div class="setting-item">
+                <div class="setting-info">
+                    <div class="setting-name">Speed Indicator</div>
+                    <div class="setting-desc">Show speed overlay on videos</div>
+                </div>
+                <div class="toggle active" id="indicatorToggle">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+
+            <!-- Position Selector -->
+            <div class="setting-item position-setting" id="positionSetting">
+                <div class="setting-info">
+                    <div class="setting-name">Indicator Position</div>
+                    <div class="setting-desc">Choose where to display the speed indicator</div>
+                </div>
+                <div class="position-grid" id="positionGrid" role="group" aria-label="Indicator position">
+                    <button class="position-btn active" data-position="top-left" title="Top Left" type="button" aria-pressed="true" aria-label="Top left">
+                        <div class="position-icon">
+                            <div class="position-dot"></div>
+                        </div>
+                    </button>
+                    <button class="position-btn" data-position="top-right" title="Top Right" type="button" aria-pressed="false" aria-label="Top right">
+                        <div class="position-icon">
+                            <div class="position-dot"></div>
+                        </div>
+                    </button>
+                    <button class="position-btn" data-position="center" title="Center" type="button" aria-pressed="false" aria-label="Center">
+                        <div class="position-icon">
+                            <div class="position-dot"></div>
+                        </div>
+                    </button>
+                    <button class="position-btn" data-position="bottom-left" title="Bottom Left" type="button" aria-pressed="false" aria-label="Bottom left">
+                        <div class="position-icon">
+                            <div class="position-dot"></div>
+                        </div>
+                    </button>
+                    <button class="position-btn" data-position="bottom-right" title="Bottom Right" type="button" aria-pressed="false" aria-label="Bottom right">
+                        <div class="position-icon">
+                            <div class="position-dot"></div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Keyboard Shortcuts Info -->
+            <div class="shortcuts-section">
+                <div class="shortcuts-header">
+                    <span class="shortcuts-title">Quick Keys</span>
+                </div>
+                <div class="shortcuts-simple">
+                    <div class="shortcut-row">
+                        <div class="shortcut-visual">
+                            <span class="speed-arrow">+</span>
+                            <span class="speed-text">Increase by 0.1x</span>
+                        </div>
+                        <div class="shortcut-combo">
+                            <kbd class="simple-key">Ctrl</kbd>
+                            <span class="key-plus">+</span>
+                            <kbd class="simple-key">.</kbd>
+                        </div>
+                    </div>
+                    
+                    <div class="shortcut-row">
+                        <div class="shortcut-visual">
+                            <span class="speed-arrow">−</span>
+                            <span class="speed-text">Decrease by 0.1x</span>
+                        </div>
+                        <div class="shortcut-combo">
+                            <kbd class="simple-key">Ctrl</kbd>
+                            <span class="key-plus">+</span>
+                            <kbd class="simple-key">,</kbd>
+                        </div>
+                    </div>
+                    
+                    <div class="shortcut-row">
+                        <div class="shortcut-visual">
+                            <span class="speed-arrow">⏩</span>
+                            <span class="speed-text">Increase by 1.0x</span>
+                        </div>
+                        <div class="shortcut-combo">
+                            <kbd class="simple-key">Ctrl</kbd>
+                            <span class="key-plus">+</span>
+                            <kbd class="simple-key">Shift</kbd>
+                            <span class="key-plus">+</span>
+                            <kbd class="simple-key">.</kbd>
+                        </div>
+                    </div>
+                    
+                    <div class="shortcut-row">
+                        <div class="shortcut-visual">
+                            <span class="speed-arrow">↻</span>
+                            <span class="speed-text">Reset to 1.0x</span>
+                        </div>
+                        <div class="shortcut-combo">
+                            <kbd class="simple-key">Ctrl</kbd>
+                            <span class="key-plus">+</span>
+                            <kbd class="simple-key">Shift</kbd>
+                            <span class="key-plus">+</span>
+                            <kbd class="simple-key">,</kbd>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="safeExecuteSetSpeed.js"></script>
+    <script src="popup.js"></script>
+</body>
+
+</html>
