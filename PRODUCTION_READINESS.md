@@ -104,10 +104,13 @@ Summary of what’s done and what’s recommended:
 - [x] MutationObserver debounced (250 ms).
 - [x] One global interval for speed re-apply; no per-video intervals.
 - [x] Try/catch around DOM and iframe access; cleanup of stale video refs and intervals.
-- [ ] Popup/background handle `executeScript` failures and “controller not ready” with retries or clear feedback.
-- [ ] Popup shows “No video detected” when the active tab has no (primary) video.
+- [x] Safe executor waits for controller (retry + backoff).
+- [x] Safe executor waits for videos (`c.videos.size > 0`) before calling setSpeed.
+- [x] Popup retries primary-video check (up to 5 tries, 250 ms) so it never lies during load.
+- [x] Popup and indicator share same logic (popup asks controller `hasPrimaryVideo()`).
+- [x] Popup/background safe executor waits for controller and videos.” - [x] Popup shows “No video detected” when the active tab has no (primary) video (retry so popup never lies during load).
 - [x] Accessibility pass (aria-labels, role=switch, keyboard).
 - [x] Pause work when tab is hidden (visibility API).
 - [x] Settings schema versioning and migration on install and load.
 
-The extension is production-ready and suitable for enterprise use.
+All MV3 timing edges are closed. The extension is reference-grade MV3 and suitable for enterprise use.

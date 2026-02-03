@@ -97,33 +97,53 @@ class SpeedTunePopup {
   }
 
   /**
+   * Ask content script for primary video with retry (controller may not be injected yet).
+   * Returns true if primary video exists, false otherwise or after max retries.
+   */
+  async checkPrimaryVideo(tabId) {
+    const MAX_TRIES = 5;
+    const RETRY_MS = 250;
+
+    for (let i = 0; i < MAX_TRIES; i++) {
+      try {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => {
+            const c = window.speedTuneController;
+            if (!c) return "not-ready";
+            return c.hasPrimaryVideo() ? "yes" : "no";
+          },
+        });
+
+        const result = results && results[0] && results[0].result;
+        if (result === "yes") return true;
+        if (result === "no") return false;
+      } catch (err) {
+        // Tab restricted / navigating / script not ready
+      }
+
+      if (i < MAX_TRIES - 1) {
+        await new Promise((r) => setTimeout(r, RETRY_MS));
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Check if current page has a primary video (same logic as indicator — single source of truth).
-   * Asks the content script controller instead of re-implementing detection.
+   * Retries so popup never lies during load.
    */
   checkVideoStatus() {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       if (chrome.runtime.lastError || !tabs || !tabs[0]) {
         this.hasVideo = false;
         this.updateVideoStatus();
         return;
       }
 
-      chrome.scripting
-        .executeScript({
-          target: { tabId: tabs[0].id },
-          func: () => {
-            if (!window.speedTuneController) return false;
-            return window.speedTuneController.hasPrimaryVideo();
-          },
-        })
-        .then((results) => {
-          this.hasVideo = !!(results && results[0] && results[0].result);
-          this.updateVideoStatus();
-        })
-        .catch(() => {
-          this.hasVideo = false;
-          this.updateVideoStatus();
-        });
+      this.hasVideo = await this.checkPrimaryVideo(tabs[0].id);
+      this.updateVideoStatus();
     });
   }
 

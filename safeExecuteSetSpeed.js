@@ -21,11 +21,14 @@
         const results = await chrome.scripting.executeScript({
           target: { tabId },
           func: (s, show, pos) => {
-            if (window.speedTuneController) {
-              window.speedTuneController.setSpeed(s, show, pos);
-              return "ok";
-            }
-            return "not-ready";
+            const c = window.speedTuneController;
+            if (!c) return "not-ready";
+
+            // Wait for videos to be detected (SPA / heavy DOM / delayed mount)
+            if (!c.videos || c.videos.size === 0) return "not-ready";
+
+            c.setSpeed(s, show, pos);
+            return "ok";
           },
           args: [speed, showIndicator, position],
         });
