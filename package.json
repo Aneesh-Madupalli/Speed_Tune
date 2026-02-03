@@ -1,0 +1,27 @@
+{
+  "name": "speed-tune",
+  "version": "1.0.0",
+  "description": "Control video playback speed on any website with ease. Speed Tune lets you watch videos faster or slower, helping you learn more efficiently, catch up on content, or enjoy videos at your perfect pace.",
+  "main": "background.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "node tests/run-all.js",
+    "test:e2e": "node tests/run-all.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aneesh-Madupalli/Speed_Tune.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Aneesh-Madupalli/Speed_Tune/issues"
+  },
+  "homepage": "https://github.com/Aneesh-Madupalli/Speed_Tune#readme",
+  "dependencies": {
+    "puppeteer": "^24.36.1"
+  }
+}
