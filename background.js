@@ -3,9 +3,43 @@
  *
  * Handles: lifecycle, commands, auto-apply on load, storage.
  * Production: settings migration, safe executor (retry/backoff), error handling.
+ *
+ * Note: safe-executor logic is inlined here because MV3 service workers
+ * do not reliably support importScripts() for extension scripts.
  */
 
-importScripts("safeExecuteSetSpeed.js");
+// ============================================================================
+// SAFE EXECUTOR (inlined from safeExecuteSetSpeed.js for MV3 service worker)
+// ============================================================================
+
+const SAFE_EXEC_MAX_RETRIES = 6;
+const SAFE_EXEC_BACKOFF_MS = 250;
+
+async function safelySetSpeed(tabId, speed, showIndicator, position) {
+  for (let attempt = 0; attempt < SAFE_EXEC_MAX_RETRIES; attempt++) {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (s, show, pos) => {
+          const c = window.speedTuneController;
+          if (!c) return "not-ready";
+          if (!c.videos || c.videos.size === 0) return "not-ready";
+          c.setSpeed(s, show, pos);
+          return "ok";
+        },
+        args: [speed, showIndicator, position],
+      });
+      const result = results && results[0] && results[0].result;
+      if (result === "ok") return true;
+    } catch (err) {
+      // Tab not ready / restricted / navigating / discarded
+    }
+    if (attempt < SAFE_EXEC_MAX_RETRIES - 1) {
+      await new Promise((r) => setTimeout(r, SAFE_EXEC_BACKOFF_MS * (attempt + 1)));
+    }
+  }
+  return false;
+}
 
 // ============================================================================
 // CONSTANTS

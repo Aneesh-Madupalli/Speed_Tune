@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>L1 Delayed Video</title>
+</head>
+<body>
+  <h1>Delayed Video Fixture</h1>
+  <p>Video will be added after 5 seconds.</p>
+  <div id="container"></div>
+  <script>
+    setTimeout(function() {
+      var v = document.createElement('video');
+      v.id = 'delayed-video';
+      v.width = 640;
+      v.height = 360;
+      v.controls = true;
+      v.innerHTML = '<source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">';
+      document.getElementById('container').appendChild(v);
+    }, 5000);
+  </script>
+</body>
+</html>

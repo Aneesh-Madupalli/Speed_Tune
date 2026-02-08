@@ -1,12 +1,51 @@
 /**
  * Speed Tune - Popup UI
- * 
+ *
  * Handles:
  * - User interface for speed control
  * - Settings management
  * - Video status detection
  * - Storage synchronization
+ *
+ * Safe-executor logic is inlined here to avoid "failed to fetch script" when
+ * loading a separate safeExecuteSetSpeed.js file from the popup.
  */
+
+// ============================================================================
+// SAFE EXECUTOR (inlined — no separate script fetch)
+// ============================================================================
+
+const SAFE_EXEC_MAX_RETRIES = 6;
+const SAFE_EXEC_BACKOFF_MS = 250;
+
+async function safelySetSpeed(tabId, speed, showIndicator, position) {
+  for (let attempt = 0; attempt < SAFE_EXEC_MAX_RETRIES; attempt++) {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (s, show, pos) => {
+          const c = window.speedTuneController;
+          if (!c) return "not-ready";
+          if (!c.videos || c.videos.size === 0) return "not-ready";
+          c.setSpeed(s, show, pos);
+          return "ok";
+        },
+        args: [speed, showIndicator, position],
+      });
+      const result = results && results[0] && results[0].result;
+      if (result === "ok") return true;
+    } catch (err) {
+      // Tab not ready / restricted / navigating / discarded
+    }
+    if (attempt < SAFE_EXEC_MAX_RETRIES - 1) {
+      await new Promise((r) => setTimeout(r, SAFE_EXEC_BACKOFF_MS * (attempt + 1)));
+    }
+  }
+  return false;
+}
+
+// Expose for popup use (same name as before)
+window.safelySetSpeed = safelySetSpeed;
 
 // ============================================================================
 // SPEED TUNE POPUP CLASS
@@ -499,7 +538,7 @@ class SpeedTunePopup {
     // Update position grid
     this.updatePositionGrid();
 
-    // Show/hide position setting based on indicator toggle
+    // Show/hide position setting based on Speed Indicator toggle
     this.elements.positionSetting.style.display = this.showIndicator ? "flex" : "none";
   }
 
