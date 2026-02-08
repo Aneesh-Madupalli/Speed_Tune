@@ -25,6 +25,10 @@
 
       this.constantIndicator = null;
       this.constantIndicatorUpdateHandlers = [];
+      /** Single source of truth: the one video eligible for speed indicator (main player only). */
+      this.indicatorPrimaryVideo = null;
+      this.indicatorRecomputeIntervalId = null;
+      this.lastIndicatorHideTime = 0;
 
       this.popupToast = null;
       this.popupToastTimeout = null;
@@ -68,6 +72,24 @@
       this.startGlobalSpeedCheck();
       this.startPeriodicScan();
       this.setupKeyboardShortcuts();
+      this.setupPlayIntentListener();
+    }
+
+    /**
+     * Bind to playback events: user intent is the strongest signal for main video.
+     * Grid/preview videos rarely receive real "play" events.
+     */
+    setupPlayIntentListener() {
+      document.addEventListener(
+        "play",
+        (e) => {
+          const v = e.target;
+          if (!(v instanceof HTMLVideoElement)) return;
+          if (!this.isLikelyMainPlayer(v)) return;
+          this.switchActiveVideo(v);
+        },
+        true
+      );
     }
 
     // ========================================================================
@@ -211,11 +233,7 @@
           if (settings.saveSpeed && settings.speed) {
             const videos = this.getAllVideos();
             if (videos.length > 0) {
-              this.setSpeed(
-                settings.speed,
-                this.showConstantIndicator,
-                this.indicatorPosition
-              );
+              this.setSpeed(settings.speed, this.showConstantIndicator, this.indicatorPosition);
             } else {
               // No videos yet - just set the speed value
               this.currentSpeed = settings.speed;
@@ -226,11 +244,11 @@
             // Save Speed is OFF - use default 1x speed
             const videos = this.getAllVideos();
             if (videos.length > 0) {
-              this.setSpeed(1.0, this.showConstantIndicator, this.indicatorPosition);
-            } else {
-              this.currentSpeed = 1.0;
-              this.hideConstantIndicator();
-              this.hidePopupToast();
+            this.setSpeed(1.0, this.showConstantIndicator, this.indicatorPosition);
+          } else {
+            this.currentSpeed = 1.0;
+            this.hideConstantIndicator();
+            this.hidePopupToast();
             }
           }
         } else {
@@ -356,24 +374,18 @@
     }
 
     /**
-     * Single global interval: re-apply speed only where it has drifted (no per-video intervals).
+     * Single global interval: re-apply speed only on the active (main) video when it drifts.
      */
     startGlobalSpeedCheck() {
       this.stopGlobalSpeedCheck();
       this.speedCheckIntervalId = setInterval(() => {
         if (document.visibilityState === "hidden") return;
         try {
+          const active = this.indicatorPrimaryVideo || this.selectPrimaryVideo();
+          if (!active || !document.contains(active) || this.isLiveVideo(active)) return;
           const targetSpeed = this.currentSpeed;
-          const all = this.getAllVideos();
-          for (const video of all) {
-            try {
-              if (!document.contains(video)) continue;
-              if (Math.abs((video.playbackRate || 1) - targetSpeed) > 0.01) {
-                video.playbackRate = targetSpeed;
-              }
-            } catch (err) {
-              // Video may be detached
-            }
+          if (Math.abs((active.playbackRate || 1) - targetSpeed) > 0.01) {
+            active.playbackRate = targetSpeed;
           }
         } catch (e) {
           // Ignore
@@ -402,6 +414,7 @@
           video.removeEventListener("playing", entry.applySpeed);
         }
         if (entry.onRateChange) video.removeEventListener("ratechange", entry.onRateChange);
+        if (entry.onDurationChange) video.removeEventListener("durationchange", entry.onDurationChange);
       } catch (e) {
         // Video may be detached
       }
@@ -425,6 +438,7 @@
           }
         }
 
+        const primary = this.selectPrimaryVideo();
         for (const video of allVideos) {
           try {
             if (!document.contains(video)) continue;
@@ -435,17 +449,20 @@
           if (!this.videos.has(video)) {
             this.videos.add(video);
 
-            try {
-              video.playbackRate = this.currentSpeed;
-            } catch (error) {
-              console.warn("[SpeedTune] Error setting playback rate:", error);
+            if (!this.isLiveVideo(video) && video === primary) {
+              try {
+                video.playbackRate = this.currentSpeed;
+              } catch (error) {
+                console.warn("[SpeedTune] Error setting playback rate:", error);
+              }
             }
 
             const applySpeed = () => {
               try {
-                if (video && document.contains(video) && !video.paused) {
-                  video.playbackRate = this.currentSpeed;
-                }
+                if (this.isLiveVideo(video)) return;
+                const active = this.indicatorPrimaryVideo || this.selectPrimaryVideo();
+                if (video !== active || !video || !document.contains(video)) return;
+                if (!video.paused) video.playbackRate = this.currentSpeed;
               } catch (err) {
                 // Ignore
               }
@@ -453,6 +470,9 @@
 
             const onRateChange = () => {
               try {
+                if (this.isLiveVideo(video)) return;
+                const active = this.indicatorPrimaryVideo || this.selectPrimaryVideo();
+                if (video !== active) return;
                 if (video && Math.abs((video.playbackRate || 1) - this.currentSpeed) > 0.01) {
                   setTimeout(() => {
                     try {
@@ -465,19 +485,30 @@
               } catch (err) {}
             };
 
+            const onDurationChange = () => {
+              try {
+                if (video && video.duration === Infinity) {
+                  this.updateIndicators(false);
+                }
+              } catch (err) {}
+            };
+
             video.addEventListener("loadstart", applySpeed);
             video.addEventListener("canplay", applySpeed);
             video.addEventListener("loadedmetadata", applySpeed);
             video.addEventListener("playing", applySpeed);
             video.addEventListener("ratechange", onRateChange);
+            video.addEventListener("durationchange", onDurationChange);
 
-            this.videoListeners.set(video, { applySpeed, onRateChange });
+            this.videoListeners.set(video, { applySpeed, onRateChange, onDurationChange });
           } else {
-            try {
-              if (document.contains(video) && Math.abs((video.playbackRate || 1) - this.currentSpeed) > 0.01) {
-                video.playbackRate = this.currentSpeed;
-              }
-            } catch (e) {}
+            if (!this.isLiveVideo(video) && video === primary) {
+              try {
+                if (document.contains(video) && Math.abs((video.playbackRate || 1) - this.currentSpeed) > 0.01) {
+                  video.playbackRate = this.currentSpeed;
+                }
+              } catch (e) {}
+            }
           }
         }
 
@@ -578,22 +609,79 @@
     }
 
     /**
-     * Get the single "primary" video for showing the speed indicator.
-     * Only considers videos in the main document that are meaningfully visible;
-     * returns the largest by area, or null if none. Avoids showing the indicator
-     * on article/image pages where the only video is in an iframe (e.g. ad).
+     * True if the video is a live stream (unbounded duration — speed cannot be controlled).
+     * HTML5: live streams report duration === Infinity per spec.
+     */
+    isLiveVideo(video) {
+      try {
+        if (!video || !document.contains(video)) return false;
+        return video.duration === Infinity || video.duration === Number.POSITIVE_INFINITY;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /** Min size for indicator: main player only (excludes small grid clips). ~16:9. */
+    static get MAIN_VIDEO_MIN_SIZE() {
+      return { width: 380, height: 214 };
+    }
+
+    /**
+     * True if the video is likely the main player (playing or has been played), not a grid thumbnail.
+     * Grid thumbnails are usually paused at currentTime 0 with only metadata loaded.
+     * Aligns with canonical "isLikelyMainVideo": ended=false, readyState>=2, not (paused at 0).
+     */
+    isLikelyMainPlayer(video) {
+      try {
+        if (!video || !document.contains(video)) return false;
+        if (video.ended) return false;
+        if (video.readyState < 2) return false;
+        if (video.paused && video.currentTime === 0) return false;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /**
+     * Candidate videos for main-player selection (do not attach UI here).
+     * Hard filters: main document, min size (main player scale), not ended, not live.
+     */
+    getCandidateVideos() {
+      const all = this.getAllVideos();
+      const { width: minW, height: minH } = SpeedTuneController.MAIN_VIDEO_MIN_SIZE;
+      return all.filter((v) => {
+        if (!this.isInMainDocument(v) || this.isLiveVideo(v) || v.ended) return false;
+        try {
+          const r = v.getBoundingClientRect();
+          return r.width >= minW && r.height >= minH;
+        } catch (e) {
+          return false;
+        }
+      });
+    }
+
+    /**
+     * Select the single primary (main) video from candidates.
+     * Prefers "likely main" (playing or paused-after-watch), then largest by area.
+     */
+    selectPrimaryVideo() {
+      const candidates = this.getCandidateVideos();
+      if (candidates.length === 0) return null;
+      const mainLike = candidates.filter((v) => this.isLikelyMainPlayer(v));
+      const pool = mainLike.length > 0 ? mainLike : candidates;
+      return pool.reduce((a, b) => {
+        const ar = a.getBoundingClientRect();
+        const br = b.getBoundingClientRect();
+        return ar.width * ar.height > br.width * br.height ? a : b;
+      });
+    }
+
+    /**
+     * Get the single "primary" video for showing the speed indicator (uses selectPrimaryVideo).
      */
     getPrimaryVideoForIndicator() {
-      const all = this.getAllVideos();
-      const candidates = all.filter(
-        (v) => this.isInMainDocument(v) && this.isMeaningfullyVisible(v)
-      );
-      if (candidates.length === 0) return null;
-      return candidates.reduce((largest, current) => {
-        const largestArea = (largest.offsetWidth || 0) * (largest.offsetHeight || 0);
-        const currentArea = (current.offsetWidth || 0) * (current.offsetHeight || 0);
-        return currentArea > largestArea ? current : largest;
-      });
+      return this.selectPrimaryVideo();
     }
 
     /**
@@ -602,6 +690,55 @@
      */
     hasPrimaryVideo() {
       return !!this.getPrimaryVideoForIndicator();
+    }
+
+    /**
+     * Whether a video meets visibility rules for showing the indicator (no active ref).
+     * Used before attaching: readyState >= 2, playback or user intent, in viewport.
+     */
+    shouldShowIndicatorForVideo(v) {
+      if (!v || !document.contains(v)) return false;
+      if (v.readyState < 2) return false;
+      if (v.paused && v.currentTime === 0) return false;
+      try {
+        const rect = v.getBoundingClientRect();
+        return (
+          rect.right > 0 &&
+          rect.left < window.innerWidth &&
+          rect.bottom > 0 &&
+          rect.top < window.innerHeight
+        );
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /**
+     * Show speed indicator only when: v is active, has enough data, and has playback or user intent.
+     * No grid thumbnails, no previews, no background autoplay.
+     */
+    shouldShowIndicator(v) {
+      return v !== null && v === this.indicatorPrimaryVideo && this.shouldShowIndicatorForVideo(v);
+    }
+
+    /**
+     * Single place to switch active video: detach UI from old, set active, attach to new.
+     * Never attach UI without detaching the old one first.
+     */
+    switchActiveVideo(v) {
+      if (v === this.indicatorPrimaryVideo) return;
+      if (!this.showConstantIndicator) return;
+      const candidates = this.getCandidateVideos();
+      if (!candidates.length || !candidates.includes(v)) return;
+
+      this.hideConstantIndicator();
+      this.indicatorPrimaryVideo = v;
+      if (!this.isLiveVideo(v)) {
+        try {
+          v.playbackRate = this.currentSpeed;
+        } catch (e) {}
+      }
+      this.createConstantIndicator(v);
     }
 
     /**
@@ -670,7 +807,7 @@
       // Round to fix floating-point precision issues
       const roundedSpeed = Math.round(speed * 100) / 100;
       this.currentSpeed = Math.max(0.1, Math.min(16, roundedSpeed));
-      
+
       // Update indicator settings
       const indicatorWasEnabled = this.showConstantIndicator;
       this.showConstantIndicator = showConstantIndicator;
@@ -682,13 +819,15 @@
         this.hidePopupToast();
       }
 
-      // Apply speed to all videos
-      const allVideos = this.getAllVideos();
-      allVideos.forEach((video) => {
-        if (video && document.contains(video)) {
-          video.playbackRate = this.currentSpeed;
-          this.videos.add(video);
-        }
+      // Apply speed only to the active (main) video — never to grid/preview/thumbnail videos
+      const active = this.indicatorPrimaryVideo || this.selectPrimaryVideo();
+      if (active && document.contains(active) && !this.isLiveVideo(active)) {
+        this.videos.add(active);
+        active.playbackRate = this.currentSpeed;
+      }
+      // Keep other videos in our set for discovery; do not change their playbackRate
+      this.getAllVideos().forEach((v) => {
+        if (v && document.contains(v)) this.videos.add(v);
       });
 
       // Update indicators (will hide if disabled)
@@ -752,10 +891,15 @@
         this.hideConstantIndicator();
         return;
       }
+      if (!this.shouldShowIndicatorForVideo(targetVideo)) {
+        this.hideConstantIndicator();
+        return;
+      }
 
       if (this.constantIndicator) {
         // Update existing indicator (only if indicator is enabled)
         if (this.showConstantIndicator) {
+          this.indicatorPrimaryVideo = targetVideo;
           this.constantIndicator.textContent = `${this.currentSpeed.toFixed(1)}x`;
           this.positionConstantIndicator(this.constantIndicator, targetVideo);
         } else {
@@ -771,8 +915,8 @@
     }
 
     /**
-     * Create constant speed indicator element
-     * Only creates if indicator is enabled
+     * Create constant speed indicator element (fade-in).
+     * Only creates if indicator is enabled.
      */
     createConstantIndicator(video) {
       // Don't create if indicator is disabled
@@ -786,7 +930,7 @@
         this.constantIndicator.setAttribute("aria-live", "polite");
         this.constantIndicator.setAttribute("role", "status");
 
-        // Styling
+        // Styling: no transition — instant show, correct position only
         Object.assign(this.constantIndicator.style, {
           position: "absolute",
           zIndex: "999999",
@@ -800,32 +944,89 @@
           fontFamily:
             '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
           pointerEvents: "none",
-          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          transform: "translateZ(0)",
-          willChange: "transform, opacity",
-          opacity: "1",
         });
 
         this.constantIndicator.textContent = `${this.currentSpeed.toFixed(1)}x`;
 
-        // Position the indicator
+        // Cache primary so scroll/resize only reposition (no expensive getPrimaryVideoForIndicator on every scroll)
+        this.indicatorPrimaryVideo = video;
         this.positionConstantIndicator(this.constantIndicator, video);
         document.body.appendChild(this.constantIndicator);
 
-        // Update position on scroll/resize; use current primary video (may change)
+        // On scroll/resize: hide instantly if video scrolled out of view; otherwise reposition.
         const updatePosition = () => {
           if (!this.showConstantIndicator || !this.constantIndicator) {
             this.hideConstantIndicator();
             return;
           }
-          const primary = this.getPrimaryVideoForIndicator();
-          if (primary) this.positionConstantIndicator(this.constantIndicator, primary);
+          let video = this.indicatorPrimaryVideo;
+          if (!video || !document.contains(video)) {
+            video = this.getPrimaryVideoForIndicator();
+            this.indicatorPrimaryVideo = video;
+            if (!video) {
+              this.hideConstantIndicator();
+              return;
+            }
+          }
+          const rect = video.getBoundingClientRect();
+          const inView =
+            rect.right > 0 &&
+            rect.left < window.innerWidth &&
+            rect.bottom > 0 &&
+            rect.top < window.innerHeight;
+          if (!inView) {
+            this.hideConstantIndicator();
+            return;
+          }
+          this.positionConstantIndicator(this.constantIndicator, video);
         };
         this.constantIndicatorUpdateHandlers.push(updatePosition);
         window.addEventListener("scroll", updatePosition, { passive: true });
         window.addEventListener("resize", updatePosition, { passive: true });
+
+        // Periodic reconciliation (anti-desync): DOM/SPA/route changes; only switch when primary changes.
+        const RECONCILE_MS = 800;
+        this.indicatorRecomputeIntervalId = setInterval(() => {
+          if (!this.showConstantIndicator) return;
+          const primary = this.selectPrimaryVideo();
+          if (!primary) {
+            if (this.constantIndicator) this.hideConstantIndicator();
+            return;
+          }
+          if (
+            this.indicatorPrimaryVideo &&
+            !this.shouldShowIndicatorForVideo(this.indicatorPrimaryVideo)
+          ) {
+            this.hideConstantIndicator();
+            return;
+          }
+          if (primary !== this.indicatorPrimaryVideo) {
+            this.switchActiveVideo(primary);
+            return;
+          }
+          if (this.constantIndicator) {
+            this.positionConstantIndicator(this.constantIndicator, primary);
+          }
+        }, RECONCILE_MS);
       } catch (error) {
         console.error("[SpeedTune] Error creating constant indicator:", error);
+      }
+    }
+
+    /**
+     * Find the <video> element at viewport coordinates (element under cursor or its ancestor).
+     */
+    getVideoAtPoint(clientX, clientY) {
+      try {
+        const el = document.elementFromPoint(clientX, clientY);
+        let node = el;
+        while (node) {
+          if (node.tagName === "VIDEO") return node;
+          node = node.parentElement;
+        }
+        return null;
+      } catch (e) {
+        return null;
       }
     }
 
@@ -876,20 +1077,29 @@
     }
 
     /**
-     * Hide constant indicator
+     * Hide constant indicator instantly (no fade — clear for user when disabled)
      */
     hideConstantIndicator() {
-      if (this.constantIndicator) {
-        this.constantIndicator.remove();
-        this.constantIndicator = null;
+      if (!this.constantIndicator) return;
 
-        // Remove event listeners
-        this.constantIndicatorUpdateHandlers.forEach((handler) => {
-          window.removeEventListener("scroll", handler);
-          window.removeEventListener("resize", handler);
-        });
-        this.constantIndicatorUpdateHandlers = [];
+      if (this.indicatorRecomputeIntervalId) {
+        clearInterval(this.indicatorRecomputeIntervalId);
+        this.indicatorRecomputeIntervalId = null;
       }
+      this.lastIndicatorHideTime = Date.now();
+      const el = this.constantIndicator;
+      const handlers = [...this.constantIndicatorUpdateHandlers];
+      this.constantIndicator = null;
+      this.constantIndicatorUpdateHandlers = [];
+      this.indicatorPrimaryVideo = null;
+
+      try {
+        el.remove();
+      } catch (e) {}
+      handlers.forEach((handler) => {
+        window.removeEventListener("scroll", handler);
+        window.removeEventListener("resize", handler);
+      });
     }
 
     /**
