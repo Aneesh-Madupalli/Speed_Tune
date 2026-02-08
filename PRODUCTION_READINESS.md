@@ -17,7 +17,7 @@ Summary of what’s done and what’s recommended:
 
 ---
 
-## 1. Production Readiness Assessment
+## 1. Production Readiness Assessment 
 
 ### What’s in good shape
 
