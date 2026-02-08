@@ -79,6 +79,7 @@ Summary of what’s done and what’s recommended:
   - Require the video to be **meaningfully visible** (not hidden or tiny).
 - On article pages with no main video but with an iframe that contains a small or hidden `<video>`, that iframe video was treated as the “primary” one and the indicator was shown (often in a corner or over the article). So the indicator appeared on pages that “only have images” from the user’s point of view.
 
+
 ### Fix applied in content.js
 
 1. **Main-document only for the indicator**  
